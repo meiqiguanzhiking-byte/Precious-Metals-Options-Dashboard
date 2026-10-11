@@ -1,0 +1,2155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>期权隐含波动率因子研究</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
+    <script src="./echarts.min.js"></script>
+    <style>
+        :root {
+            --sidebar-width: 288px;
+            --sidebar-collapsed-width: 76px;
+            --brand-blue: #174ea6;
+            --ink: #1f2937;
+            --muted: #6b7280;
+            --line: #dfe5ee;
+            --surface: #ffffff;
+            --page-bg: #f4f6fa;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            background-color: var(--page-bg);
+            margin: 0;
+            font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+            color: var(--ink);
+        }
+
+        .app-shell {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+            transition: grid-template-columns 0.22s ease;
+        }
+
+        .app-shell.sidebar-collapsed {
+            grid-template-columns: var(--sidebar-collapsed-width) minmax(0, 1fr);
+        }
+
+        .sidebar {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            background: #10233f;
+            color: #eef4ff;
+            border-right: 1px solid rgba(255,255,255,0.08);
+            padding: 18px 14px;
+            overflow: hidden;
+        }
+
+        .sidebar-head {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            min-height: 72px;
+            padding: 4px 2px 18px;
+            border-bottom: 1px solid rgba(255,255,255,0.12);
+        }
+
+        .sidebar-toggle {
+            width: 42px;
+            height: 42px;
+            flex: 0 0 42px;
+            border: 1px solid rgba(255,255,255,0.22);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.08);
+            color: #ffffff;
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .sidebar-title {
+            margin: 2px 0 0;
+            font-size: 18px;
+            line-height: 1.35;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-top: 18px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 46px;
+            width: 100%;
+            border: 0;
+            border-radius: 8px;
+            padding: 0 12px;
+            background: transparent;
+            color: rgba(238,244,255,0.78);
+            text-align: left;
+            font-size: 15px;
+            transition: background 0.18s ease, color 0.18s ease;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(255,255,255,0.12);
+            color: #ffffff;
+        }
+
+        .nav-index {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            flex: 0 0 28px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.12);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .app-shell.sidebar-collapsed .sidebar {
+            padding-left: 16px;
+            padding-right: 16px;
+        }
+
+        .app-shell.sidebar-collapsed .sidebar-head {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .app-shell.sidebar-collapsed .sidebar-title,
+        .app-shell.sidebar-collapsed .nav-text {
+            display: none;
+        }
+
+        .app-shell.sidebar-collapsed .nav-item {
+            justify-content: center;
+            padding: 0;
+        }
+
+        .main-content {
+            min-width: 0;
+            padding: 20px;
+        }
+
+        .content-panel { display: none; }
+        .content-panel.active { display: block; }
+
+        .chart-container { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 30px; }
+        .chart-box { height: 450px; width: 100%; }
+        h2 { border-left: 6px solid #0d6efd; padding-left: 15px; margin-bottom: 20px; font-size: 1.5rem; }
+        .placeholder-panel {
+            min-height: calc(100vh - 40px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px dashed var(--line);
+            background: var(--surface);
+            border-radius: 12px;
+            color: var(--muted);
+            font-size: 18px;
+        }
+
+        .section-kicker {
+            margin: 0 0 18px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .theory-flow {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            align-items: stretch;
+        }
+
+        .flow-step {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 88px;
+            border: 1px solid #b7c8d9;
+            border-radius: 8px;
+            padding: 16px 18px;
+            background: #f7fbff;
+            color: #12345c;
+            font-size: 19px;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .flow-step:not(:last-child)::after {
+            content: "→";
+            position: absolute;
+            right: -13px;
+            top: 50%;
+            z-index: 1;
+            transform: translateY(-50%);
+            color: #174ea6;
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .model-note {
+            margin: 16px 0 0;
+            color: #5d6978;
+            line-height: 1.75;
+            font-size: 14px;
+        }
+
+        .toolbar-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .control-label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            overflow: hidden;
+            border: 1px solid #b7c8d9;
+            border-radius: 8px;
+        }
+
+        .summary-table th,
+        .summary-table td {
+            border: 1px solid #b7c8d9;
+            padding: 15px 18px;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .summary-table th {
+            background: #dce8f3;
+            color: #12345c;
+            font-weight: 700;
+        }
+
+        .summary-table td:first-child,
+        .summary-table th:first-child {
+            text-align: left;
+        }
+
+        .best-tag {
+            color: #111827;
+            font-style: italic;
+            font-weight: 700;
+        }
+
+        .inverse-row td {
+            background: #fbfdff;
+            color: #12345c;
+        }
+
+        .metric-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: -4px 0 16px;
+        }
+
+        .metric-chip {
+            min-width: 132px;
+            border: 1px solid #d7e1ec;
+            border-radius: 8px;
+            padding: 10px 14px;
+            background: #f8fbff;
+        }
+
+        .metric-chip span {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .metric-chip strong {
+            display: block;
+            margin-top: 3px;
+            color: #12345c;
+            font-size: 18px;
+        }
+
+        .pac5-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+            gap: 14px;
+            align-items: stretch;
+        }
+
+        .pac5-summary-card {
+            aspect-ratio: 1 / 1;
+            min-height: 168px;
+            border: 1px solid #d7e1ec;
+            border-radius: 8px;
+            background: #f8fbff;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+        }
+
+        .pac5-summary-card .card-label {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .pac5-summary-card .card-value {
+            color: #12345c;
+            font-size: clamp(18px, 2vw, 28px);
+            font-weight: 800;
+            line-height: 1.2;
+            overflow-wrap: anywhere;
+        }
+
+        .pac5-summary-card .card-note {
+            color: #5d6978;
+            font-size: 12px;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .garch-r2-table {
+            width: 100%;
+            margin-top: 18px;
+            border-collapse: collapse;
+            background: #ffffff;
+        }
+
+        .garch-r2-table th,
+        .garch-r2-table td {
+            border-bottom: 1px solid #edf1f6;
+            padding: 13px 14px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .garch-r2-table th {
+            color: #1f2937;
+            font-weight: 700;
+        }
+
+        .garch-r2-table td {
+            color: #202734;
+        }
+
+        .eval-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .eval-card {
+            border: 1px solid #d7e1ec;
+            border-radius: 8px;
+            padding: 16px;
+            background: #fbfdff;
+        }
+
+        .eval-card h3 {
+            margin: 0 0 14px;
+            color: #12345c;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .confusion-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #ffffff;
+        }
+
+        .confusion-table th,
+        .confusion-table td {
+            border: 1px solid #d7e1ec;
+            padding: 12px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .confusion-table th {
+            background: #edf4fb;
+            color: #12345c;
+            font-weight: 700;
+        }
+
+        .accuracy-chip {
+            border-color: #0d6efd;
+            background: #eef5ff;
+        }
+
+        .accuracy-chip strong {
+            color: #0d6efd;
+            font-size: 22px;
+        }
+
+        .factor-eval-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #ffffff;
+        }
+
+        .factor-eval-table th,
+        .factor-eval-table td {
+            border-bottom: 1px solid #edf1f6;
+            padding: 12px 14px;
+            text-align: center;
+            font-size: 14px;
+            vertical-align: middle;
+        }
+
+        .factor-eval-table th {
+            background: #edf4fb;
+            color: #12345c;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .factor-eval-table td:first-child,
+        .factor-eval-table td:nth-child(2),
+        .factor-eval-table th:first-child,
+        .factor-eval-table th:nth-child(2) {
+            text-align: left;
+        }
+
+        .factor-group-row td {
+            background: #f7fbff;
+            color: #12345c;
+            font-weight: 700;
+        }
+
+        .sig-yes {
+            color: #dc3545;
+            font-weight: 700;
+        }
+
+        .sig-no {
+            color: #198754;
+            font-weight: 700;
+        }
+
+        @media (max-width: 900px) {
+            .app-shell,
+            .app-shell.sidebar-collapsed {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: relative;
+                height: auto;
+                border-right: 0;
+            }
+
+            .app-shell.sidebar-collapsed .sidebar-nav {
+                display: none;
+            }
+
+            .main-content {
+                padding: 14px;
+            }
+
+            .theory-flow {
+                grid-template-columns: 1fr;
+            }
+
+            .eval-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .flow-step:not(:last-child)::after {
+                content: "↓";
+                right: 50%;
+                top: auto;
+                bottom: -24px;
+                transform: translateX(50%);
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-shell" class="app-shell">
+    <aside class="sidebar">
+        <div class="sidebar-head">
+            <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="展开或隐藏侧边栏" title="展开或隐藏侧边栏">☰</button>
+            <h1 class="sidebar-title">期权隐含波动率因子研究</h1>
+        </div>
+        <nav class="sidebar-nav" aria-label="看板栏目">
+            <button class="nav-item active" type="button" data-panel="panel-data">
+                <span class="nav-index">1</span>
+                <span class="nav-text">数据与因子展示</span>
+            </button>
+            <button class="nav-item" type="button" data-panel="panel-rnprob">
+                <span class="nav-index">2</span>
+                <span class="nav-text">风险中性概率分布</span>
+            </button>
+            <button class="nav-item" type="button" data-panel="panel-garch">
+                <span class="nav-index">3</span>
+                <span class="nav-text">GARCH基准模型</span>
+            </button>
+            <button class="nav-item" type="button" data-panel="panel-eval">
+                <span class="nav-index">4</span>
+                <span class="nav-text">因子评价体系</span>
+            </button>
+            <button class="nav-item" type="button" data-panel="panel-ff25">
+                <span class="nav-index">5</span>
+                <span class="nav-text">伦敦金期货期权展示</span>
+            </button>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <section id="panel-data" class="content-panel active">
+<div class="container-fluid">
+    <div class="chart-container">
+        <div class="row align-items-center">
+            <div class="col-md-3">
+                <select id="select-asset" class="form-select" onchange="switchAsset(this.value)"></select>
+            </div>
+            <div class="col-md-9 text-muted">
+                当前资产：<span id="asset-label">--</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 板块 1 -->
+    <div class="chart-container">
+        <h2>板块一：<span id="chart-one-asset">USO</span> 价格走势 (收盘价)</h2>
+        <div id="chart-one" class="chart-box"></div>
+    </div>
+
+    <!-- 板块 2 -->
+    <div class="chart-container">
+        <h2>板块二：收益率序列与因子动力学</h2>
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <select id="select-factor-two" class="form-select" onchange="renderChartTwo()">
+                    <optgroup label="隐含波动率十因子">
+                        <option value="Level_sm">Level</option><option value="Slope_sm">Slope</option>
+                        <option value="Curv_sm">Curv</option><option value="TC_sm">TC</option>
+                        <option value="FC_sm">FC</option><option value="DLevel">DLevel</option>
+                        <option value="DSlope">DSlope</option><option value="DCurv">DCurv</option>
+                        <option value="DTC">DTC</option><option value="DFC">DFC</option>
+                    </optgroup>
+                    <optgroup label="风险中性四因子">
+                        <option value="DRNC">DRNC</option><option value="DRNV">DRNV</option>
+                        <option value="TRNC">TRNC</option><option value="TRNV">TRNV</option>
+                    </optgroup>
+                    <optgroup label="风险溢价六因子">
+                        <option value="CRP">CRP</option><option value="VVRP">VVRP</option>
+                        <option value="RC">RC</option><option value="RVV">RVV</option>
+                        <option value="HC">HC</option><option value="HVV">HVV</option>
+                    </optgroup>
+                </select>
+            </div>
+        </div>
+        <div id="chart-two" class="chart-box"></div>
+    </div>
+
+    <!-- 板块三 -->
+    <div class="chart-container">
+        <h2>板块三：单因子回归预测 <span id="r2-display" class="badge bg-primary float-end badge-r2">样本外 R²: --% | 最优h: --</span></h2>
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <select id="select-factor-three" class="form-select" onchange="loadChartThree()">
+                    <optgroup label="隐含波动率十因子">
+                        <option value="Level_sm">Level</option><option value="Slope_sm">Slope</option>
+                        <option value="Curv_sm">Curv</option><option value="TC_sm">TC</option>
+                        <option value="FC_sm">FC</option><option value="DLevel">DLevel</option>
+                        <option value="DSlope">DSlope</option><option value="DCurv">DCurv</option>
+                        <option value="DTC">DTC</option><option value="DFC">DFC</option>
+                    </optgroup>
+                    <optgroup label="风险中性四因子">
+                        <option value="DRNC">DRNC</option><option value="DRNV">DRNV</option>
+                        <option value="TRNC">TRNC</option><option value="TRNV">TRNV</option>
+                    </optgroup>
+                    <optgroup label="风险溢价六因子">
+                        <option value="CRP">CRP</option><option value="VVRP">VVRP</option>
+                        <option value="RC">RC</option><option value="RVV">RVV</option>
+                        <option value="HC">HC</option><option value="HVV">HVV</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div class="col-md-9 text-muted pt-1">
+                ※ 固定背景：超额收益率(%) | 动态展示：单因子扩展窗口
+            </div>
+        </div>
+        <div id="chart-three" class="chart-box"></div>
+    </div>
+        </div>
+        </section>
+
+        <section id="panel-rnprob" class="content-panel">
+            <div class="container-fluid">
+                <div class="chart-container">
+                    <div class="toolbar-row">
+                        <div>
+                            <label class="control-label" for="select-ipod-asset">资产选择</label>
+                            <select id="select-ipod-asset" class="form-select" onchange="switchIpodAsset(this.value)"></select>
+                        </div>
+                        <div class="text-muted pt-4">
+                            当前资产：<span id="ipod-asset-label">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h2>板块一：风险中性概率分布构建</h2>
+                    <div class="theory-flow">
+                        <div class="flow-step">iPoD期权隐含违约概率</div>
+                        <div class="flow-step">风险中性概率分布</div>
+                        <div class="flow-step">Breeden-Litzenberger 密度恢复</div>
+                        <div class="flow-step">单峰偏 t 分布</div>
+                    </div>
+                    <p class="model-note">模型思想：根据iPoD的思想从现有期权的价格构建风险中性概率分布，从分布的偏度推断出未来到期标的价格的涨跌。用Breeden-Litzenberger 通过价格对执行价的二阶导数恢复风险中性密度，通过偏t分布提取中位数、众数和均值作为因子信息</p>
+                </div>
+
+                <div class="chart-container">
+                    <h2>板块二：单点方向指标走势</h2>
+                    <div class="row mb-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="control-label" for="select-ipod-measure">统计量选择</label>
+                            <select id="select-ipod-measure" class="form-select" onchange="switchIpodMeasure(this.value)">
+                                <option value="median">中位数</option>
+                                <option value="mode">众数</option>
+                                <option value="mean">均值</option>
+                            </select>
+                        </div>
+                        <div class="col-md-9 text-muted pb-2">
+                            指标为偏 t 分布统计量与当日标的价格差值；剔除绝对值高于 5 的异常点后，按到期最近 5 点、10 点和全部有效点加权合成。
+                        </div>
+                    </div>
+                    <div id="chart-ipod-direction" class="chart-box"></div>
+                </div>
+
+                <div class="chart-container">
+                    <h2>板块三：方向准确率判断</h2>
+                    <div class="table-responsive">
+                        <table class="summary-table">
+                            <thead>
+                                <tr>
+                                    <th>资产 / 统计量</th>
+                                    <th>样本到期日</th>
+                                    <th>I_5</th>
+                                    <th>I_10</th>
+                                    <th>I_all</th>
+                                    <th>最优结果</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ipod-summary-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section id="panel-garch" class="content-panel">
+            <div class="container-fluid">
+                <div class="chart-container">
+                    <div class="toolbar-row">
+                        <div>
+                            <label class="control-label" for="select-garch-asset">资产选择</label>
+                            <select id="select-garch-asset" class="form-select" onchange="switchGarchAsset(this.value)"></select>
+                        </div>
+                        <div class="text-muted pt-4">
+                            当前资产：<span id="garch-asset-label">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h2>板块一：收益率波动与GARCH条件预测方差</h2>
+                    <div id="chart-garch-vol" class="chart-box"></div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="toolbar-row mb-3">
+                        <h2 class="mb-0">板块二：GV与IV组合回归</h2>
+                        <div>
+                            <label class="control-label" for="select-garch-horse-horizon">预测期限</label>
+                            <select id="select-garch-horse-horizon" class="form-select" onchange="switchGarchHorseHorizon(this.value)"></select>
+                        </div>
+                    </div>
+                    <div class="metric-strip">
+                        <div class="metric-chip"><span>RMSE</span><strong id="garch-horse-rmse">--</strong></div>
+                        <div class="metric-chip"><span>QLIKE</span><strong id="garch-horse-qlike">--</strong></div>
+                        <div class="metric-chip"><span>样本数</span><strong id="garch-horse-n">--</strong></div>
+                    </div>
+                    <div id="chart-garch-horse" class="chart-box"></div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="toolbar-row mb-3">
+                        <h2 class="mb-0">板块三：基准模型</h2>
+                        <div>
+                            <label class="control-label" for="select-garch-baseline-horizon">预测期限</label>
+                            <select id="select-garch-baseline-horizon" class="form-select" onchange="switchGarchBaselineHorizon(this.value)"></select>
+                        </div>
+                    </div>
+                    <div class="metric-strip">
+                        <div class="metric-chip"><span>样本外 R² OS</span><strong id="garch-baseline-r2">--</strong></div>
+                        <div class="metric-chip"><span>样本外样本数</span><strong id="garch-baseline-n">--</strong></div>
+                    </div>
+                    <div id="chart-garch-baseline" class="chart-box"></div>
+                    <div class="table-responsive">
+                        <table class="garch-r2-table">
+                            <thead>
+                                <tr>
+                                    <th>h</th>
+                                    <th>R2_OS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="garch-r2-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section id="panel-eval" class="content-panel">
+            <div class="container-fluid">
+                <div class="chart-container">
+                    <div class="toolbar-row">
+                        <div>
+                            <label class="control-label" for="select-eval-asset">资产选择</label>
+                            <select id="select-eval-asset" class="form-select" onchange="switchEvalAsset(this.value)"></select>
+                        </div>
+                        <div>
+                            <label class="control-label" for="select-eval-factor">因子选择</label>
+                            <select id="select-eval-factor" class="form-select" onchange="switchEvalFactor(this.value)"></select>
+                        </div>
+                        <div class="text-muted pt-4">
+                            当前资产：<span id="eval-asset-label">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h2>板块一：滚动窗口回归检验 <span id="eval-r2-display" class="badge bg-primary float-end badge-r2">R² OS: --% | 最优h: --</span></h2>
+                    <div class="text-muted mb-3">固定窗口：30 个有效交易日 | 动态展示：单因子滚动 OLS 预测线</div>
+                    <div id="chart-eval-rolling" class="chart-box"></div>
+                </div>
+
+                <div class="chart-container">
+                    <h2>板块二：混淆矩阵和方向准确率</h2>
+                    <div class="eval-grid">
+                        <div class="eval-card">
+                            <h3>扩展窗口回归</h3>
+                            <div id="eval-confusion-expanding"></div>
+                        </div>
+                        <div class="eval-card">
+                            <h3>30 天滚动窗口</h3>
+                            <div id="eval-confusion-rolling"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h2>板块三：显著因子筛选</h2>
+                    <div class="table-responsive">
+                        <table class="factor-eval-table">
+                            <thead>
+                                <tr>
+                                    <th>因子名称</th>
+                                    <th>因子解释</th>
+                                    <th>R方os</th>
+                                    <th>最优预测期限</th>
+                                    <th>基准R方</th>
+                                    <th>rankIC</th>
+                                    <th>预测准确率</th>
+                                    <th>显著性</th>
+                                </tr>
+                            </thead>
+                            <tbody id="eval-factor-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section id="panel-ff25" class="content-panel">
+            <div class="container-fluid">
+                <div class="chart-container">
+                    <h2>模型综合结论</h2>
+                    <div id="pac5-summary-grid" class="pac5-summary-grid"></div>
+                </div>
+
+                <div class="chart-container">
+                    <h2>板块一：标的数据与因子展示</h2>
+                    <div class="toolbar-row mb-3">
+                        <div>
+                            <label class="control-label" for="select-pac5-factor-main">因子选择</label>
+                            <select id="select-pac5-factor-main" class="form-select" onchange="switchPac5Factor(this.value)"></select>
+                        </div>
+                        <div class="text-muted pt-4">
+                            当前资产：<span id="pac5-asset-label">伦敦金期货期权</span>
+                        </div>
+                    </div>
+                    <div id="chart-pac5-price" class="chart-box"></div>
+                    <div id="chart-pac5-factor" class="chart-box"></div>
+                </div>
+
+                <div class="chart-container">
+                    <h2>板块二：滚动窗口拟合回归 <span id="pac5-r2-display" class="badge bg-primary float-end badge-r2">R² OS: --% | 准确率: --</span></h2>
+                    <div class="toolbar-row mb-3">
+                        <div>
+                            <label class="control-label" for="select-pac5-window">滚动窗口长度</label>
+                            <select id="select-pac5-window" class="form-select" onchange="switchPac5Window(this.value)"></select>
+                        </div>
+                        <div>
+                            <label class="control-label" for="select-pac5-factor-reg">因子选择</label>
+                            <select id="select-pac5-factor-reg" class="form-select" onchange="switchPac5Factor(this.value)"></select>
+                        </div>
+                        <div>
+                            <label class="control-label" for="select-pac5-horizon">预测期限</label>
+                            <select id="select-pac5-horizon" class="form-select" onchange="switchPac5Horizon(this.value)"></select>
+                        </div>
+                    </div>
+                    <div id="chart-pac5-rolling" class="chart-box"></div>
+                </div>
+
+                <div class="chart-container">
+                    <h2>板块三：显著因子筛选</h2>
+                    <div class="toolbar-row mb-3">
+                        <div>
+                            <label class="control-label" for="select-pac5-preference">筛选偏好</label>
+                            <select id="select-pac5-preference" class="form-select" onchange="switchPac5Preference(this.value)">
+                                <option value="r2">拟合优度偏好</option>
+                                <option value="accuracy">预测准确率偏好</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="factor-eval-table">
+                            <thead>
+                                <tr>
+                                    <th>因子名称</th>
+                                    <th>因子解释</th>
+                                    <th>R方os</th>
+                                    <th>最优滚动窗口长度</th>
+                                    <th>最优预测期限</th>
+                                    <th>预测准确率</th>
+                                    <th>显著性</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pac5-factor-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script src="./dashboard_data.js"></script>
+<script src="./ipod_direction_data.js"></script>
+<script src="./garch_data.js"></script>
+<script src="./eval_data.js"></script>
+<script src="./pac5_data.js"></script>
+<script>
+    const dashboardData = window.DASHBOARD_DATA || {
+        default_asset: 'USO1',
+        assets: {
+            // Python 打包后，把 dashboard_data.json 的内容放到 window.DASHBOARD_DATA 即可。
+            // 结构示例：USO1: { label: 'USO1', section_all: [], predictions: {} }
+        }
+    };
+    const ipodDirectionData = window.IPOD_DIRECTION_DATA || {
+        default_asset: 'USO',
+        default_measure: 'median',
+        measures: { median: '中位数', mode: '众数', mean: '均值' },
+        assets: {}
+    };
+    const garchData = window.GARCH_DATA || {
+        default_asset: 'USO1',
+        default_horizon: 5,
+        horizons: [5, 10, 21, 42, 63],
+        assets: {}
+    };
+    const evalData = window.EVAL_DATA || {
+        default_asset: 'USO1',
+        rolling_window: 30,
+        assets: {}
+    };
+    const pac5Data = window.PAC5_DATA || {
+        default_asset: 'GC',
+        default_factor: 'Level_sm',
+        default_window: 30,
+        default_horizon: 1,
+        windows: [30, 60, 90, 180, 360],
+        horizons: [1, 5, 10, 21, 42, 63],
+        assets: {}
+    };
+
+    let currentAsset = dashboardData.default_asset || Object.keys(dashboardData.assets || {})[0];
+    let fullData = null;
+    let currentIpodAsset = ipodDirectionData.default_asset || Object.keys(ipodDirectionData.assets || {})[0];
+    let currentIpodMeasure = ipodDirectionData.default_measure || 'median';
+    let cIpodDirection = null;
+    let ipodInitialized = false;
+    let currentGarchAsset = garchData.default_asset || Object.keys(garchData.assets || {})[0];
+    let currentGarchHorseHorizon = String(garchData.default_horizon || 5);
+    let currentGarchBaselineHorizon = String(garchData.default_horizon || 5);
+    let cGarchVol = null;
+    let cGarchHorse = null;
+    let cGarchBaseline = null;
+    let garchInitialized = false;
+    let currentEvalAsset = evalData.default_asset || Object.keys(evalData.assets || {})[0];
+    let currentEvalFactor = 'Level_sm';
+    let cEvalRolling = null;
+    let evalInitialized = false;
+    let currentPac5Asset = pac5Data.default_asset || Object.keys(pac5Data.assets || {})[0];
+    let currentPac5Factor = pac5Data.default_factor || 'Level_sm';
+    let currentPac5Window = String(pac5Data.default_window || 30);
+    let currentPac5Horizon = String(pac5Data.default_horizon || 1);
+    let currentPac5Preference = 'r2';
+    let cPac5Price = null;
+    let cPac5Factor = null;
+    let cPac5Rolling = null;
+    let pac5Initialized = false;
+
+    const dZoom = [
+        { type: 'inside', start: 0, end: 100 },
+        { type: 'slider', start: 0, end: 100 }
+    ];
+
+    const c1 = echarts.init(document.getElementById('chart-one'));
+    const c2 = echarts.init(document.getElementById('chart-two'));
+    const c3 = echarts.init(document.getElementById('chart-three'));
+
+    function initLayout() {
+        const appShell = document.getElementById('app-shell');
+        const toggle = document.getElementById('sidebar-toggle');
+        const navItems = document.querySelectorAll('.nav-item');
+        const panels = document.querySelectorAll('.content-panel');
+
+        toggle.addEventListener('click', () => {
+            appShell.classList.toggle('sidebar-collapsed');
+            requestAnimationFrame(() => {
+                c1.resize();
+                c2.resize();
+                c3.resize();
+                if (cIpodDirection) cIpodDirection.resize();
+                resizeGarchCharts();
+            });
+        });
+
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const target = item.dataset.panel;
+                navItems.forEach(nav => nav.classList.toggle('active', nav === item));
+                panels.forEach(panel => panel.classList.toggle('active', panel.id === target));
+                if (target === 'panel-data') {
+                    requestAnimationFrame(() => {
+                        c1.resize();
+                        c2.resize();
+                        c3.resize();
+                    });
+                } else if (target === 'panel-rnprob') {
+                    requestAnimationFrame(() => {
+                        initIpodPanel();
+                        if (cIpodDirection) cIpodDirection.resize();
+                    });
+                } else if (target === 'panel-garch') {
+                    requestAnimationFrame(() => {
+                        initGarchPanel();
+                        resizeGarchCharts();
+                    });
+                } else if (target === 'panel-eval') {
+                    requestAnimationFrame(() => {
+                        initEvalPanel();
+                        resizeEvalCharts();
+                    });
+                } else if (target === 'panel-ff25') {
+                    requestAnimationFrame(() => {
+                        initPac5Panel();
+                        resizePac5Charts();
+                    });
+                }
+            });
+        });
+    }
+
+    // 2. 初始化：一次性加载所有打包好的数据
+    function initBase() {
+        try {
+            initLayout();
+            initAssetSelector();
+            initIpodPanel();
+            initGarchPanel();
+            initEvalPanel();
+            initPac5Panel();
+            switchAsset(currentAsset);
+        } catch (e) {
+            console.error("渲染失败:", e);
+            alert("图表渲染出错，请检查数据格式。");
+        }
+    }
+
+    function initAssetSelector() {
+        const selector = document.getElementById('select-asset');
+        const assets = dashboardData.assets || {};
+        const assetKeys = Object.keys(assets);
+
+        if (!assetKeys.length) {
+            throw new Error('未找到资产数据，请先注入 window.DASHBOARD_DATA 或重新运行 Python 打包。');
+        }
+
+        selector.innerHTML = assetKeys
+            .map(key => `<option value="${key}">${assets[key].label || key}</option>`)
+            .join('');
+
+        if (!assets[currentAsset]) currentAsset = assetKeys[0];
+        selector.value = currentAsset;
+    }
+
+    function switchAsset(assetKey) {
+        const assetData = dashboardData.assets[assetKey];
+        if (!assetData) {
+            console.warn(`资产 ${assetKey} 的数据未找到`);
+            return;
+        }
+
+        currentAsset = assetKey;
+        fullData = assetData;
+
+        const label = fullData.label || currentAsset;
+        document.getElementById('asset-label').innerText = label;
+        document.getElementById('chart-one-asset').innerText = label;
+
+        renderChartOne();
+        renderChartTwo();
+        loadChartThree();
+    }
+
+    function renderChartOne() {
+        if (!fullData) return;
+        const data = fullData.section_all;
+        c1.setOption({
+            tooltip: { trigger: 'axis' },
+            dataZoom: dZoom,
+            xAxis: { type: 'category', data: data.map(i => i.date) },
+            yAxis: { type: 'value', scale: true, name: 'Price' },
+            series: [{ name: `${fullData.label || currentAsset} Close`, type: 'line', data: data.map(i => i.close), itemStyle: {color: '#0d6efd'} }]
+        });
+    }
+
+    function renderChartTwo() {
+        if (!fullData) return;
+        const factor = document.getElementById('select-factor-two').value;
+        const data = fullData.section_all;
+
+        // 数据排序与过滤
+        const sortedData = data
+            .filter(i => i.date && i[factor] != null)
+            .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        const dates = sortedData.map(i => i.date);
+        const exRet = sortedData.map(i => i.ex_ret);
+        const factorVal = sortedData.map(i => i[factor]);
+
+        c2.setOption({
+            tooltip: {
+                trigger: 'axis',
+                formatter: params => {
+                    let res = `${params[0].name}<br/>`;
+                    params.forEach(p => {
+                        const val = p.value != null ? p.value.toFixed(4) : '-';
+                        res += `${p.marker} ${p.seriesName}: <b>${val}</b><br/>`;
+                    });
+                    return res;
+                }
+            },
+            legend: { data: ['超额收益率', factor], top: '5%' },
+            grid: { left: '3%', right: '3%', bottom: '15%', containLabel: true },
+            dataZoom: dZoom,
+            xAxis: { type: 'category', data: dates },
+            yAxis: [
+                { type: 'value', name: '收益率 (%)', position: 'left' },
+                { type: 'value', name: '因子值', position: 'right', scale: true }
+            ],
+            series: [
+                {
+                    name: '超额收益率',
+                    type: 'line',
+                    data: exRet,
+                    connectNulls: true,
+                    lineStyle: { width: 1.5, color: '#6c757d', opacity: 0.8 }
+                },
+                {
+                    name: factor,
+                    type: 'line',
+                    yAxisIndex: 1,
+                    data: factorVal,
+                    connectNulls: true,
+                    itemStyle: { color: '#f1c40f' },
+                    lineStyle: { width: 2 }
+                }
+            ]
+        }, true);
+    }
+
+    // 3. 修改板块三：直接从内存中读取预测结果，不再 fetch
+    function loadChartThree() {
+        if (!fullData) return;
+        const factor = document.getElementById('select-factor-three').value;
+
+        // 从预加载的 predictions 对象中通过 key 直接获取
+        const res = fullData.predictions[factor];
+
+        if (!res) {
+            console.warn(`因子 ${factor} 的预测数据未找到`);
+            return;
+        }
+
+        document.getElementById('r2-display').innerText = `样本外 R²: ${res.r2_os}% | 最优h: ${res.horizon || '--'}`;
+
+        c3.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['超额收益率(背景)', '预测曲线'] },
+            dataZoom: dZoom,
+            xAxis: { type: 'category', data: res.chart_data.map(i => i.date) },
+            yAxis: { type: 'value', name: 'Return (%)' },
+            series: [
+                {
+                    name: '超额收益率(背景)',
+                    type: 'line',
+                    data: res.chart_data.map(i => i.actual),
+                    lineStyle: {color: '#bdc3c7', opacity: 0.4}
+                },
+                {
+                    name: '预测曲线',
+                    type: 'line',
+                    // 注意：如果后端打包时已经乘了 100，这里保持一致
+                    data: res.chart_data.map(i => i.predict / 100),
+                    lineStyle: {color: '#dc3545', width: 2.5},
+                    smooth: true
+                }
+            ]
+        }, true);
+    }
+
+    function initIpodPanel() {
+        const assets = ipodDirectionData.assets || {};
+        const assetKeys = Object.keys(assets);
+        if (!assetKeys.length) return;
+
+        if (!ipodInitialized) {
+            const selector = document.getElementById('select-ipod-asset');
+            selector.innerHTML = assetKeys
+                .map(key => `<option value="${key}">${assets[key].label || key}</option>`)
+                .join('');
+
+            const measureSelector = document.getElementById('select-ipod-measure');
+            const measures = ipodDirectionData.measures || {};
+            measureSelector.innerHTML = Object.keys(measures)
+                .map(key => `<option value="${key}">${measures[key]}</option>`)
+                .join('');
+
+            if (!assets[currentIpodAsset]) currentIpodAsset = assetKeys[0];
+            if (!measures[currentIpodMeasure]) currentIpodMeasure = Object.keys(measures)[0] || 'median';
+            selector.value = currentIpodAsset;
+            measureSelector.value = currentIpodMeasure;
+            cIpodDirection = echarts.init(document.getElementById('chart-ipod-direction'));
+            ipodInitialized = true;
+        }
+
+        renderIpodPanel();
+    }
+
+    function switchIpodAsset(assetKey) {
+        currentIpodAsset = assetKey;
+        renderIpodPanel();
+    }
+
+    function switchIpodMeasure(measureKey) {
+        currentIpodMeasure = measureKey;
+        renderIpodPanel();
+    }
+
+    function formatPct(value) {
+        return `${(value * 100).toFixed(1)}%`;
+    }
+
+    function formatNum(value) {
+        if (value == null || Number.isNaN(Number(value))) return '-';
+        return Number(value).toFixed(3);
+    }
+
+    function indicatorLabel(key) {
+        return key === 'I_all' ? 'I_all' : key;
+    }
+
+    function directionSign(value) {
+        const number = Number(value);
+        if (number > 0) return 1;
+        if (number < 0) return -1;
+        return 0;
+    }
+
+    function inverseAccuracy(rows, indicatorKey) {
+        if (!rows || !rows.length) return 0;
+        const correct = rows.reduce((sum, row) => {
+            const inversePrediction = directionSign(-Number(row[indicatorKey]));
+            return sum + (inversePrediction === Number(row.true_sign) ? 1 : 0);
+        }, 0);
+        return correct / rows.length;
+    }
+
+    function renderIpodPanel() {
+        const asset = (ipodDirectionData.assets || {})[currentIpodAsset];
+        if (!asset) return;
+
+        const measureData = asset.measures[currentIpodMeasure];
+        if (!measureData) return;
+
+        document.getElementById('ipod-asset-label').innerText = asset.label || currentIpodAsset;
+        document.getElementById('select-ipod-asset').value = currentIpodAsset;
+        document.getElementById('select-ipod-measure').value = currentIpodMeasure;
+
+        renderIpodChart(asset, measureData);
+        renderIpodSummary(asset);
+    }
+
+    function renderIpodChart(asset, measureData) {
+        if (!cIpodDirection) return;
+        const rows = measureData.series || [];
+        const accuracies = measureData.accuracies || {};
+        const measureLabel = measureData.label || currentIpodMeasure;
+        const legendNames = [
+            `I_5，准确率=${formatPct(accuracies.I_5 || 0)}`,
+            `I_10，准确率=${formatPct(accuracies.I_10 || 0)}`,
+            `I_all，准确率=${formatPct(accuracies.I_all || 0)}`
+        ];
+
+        cIpodDirection.setOption({
+            title: {
+                text: `${asset.label || currentIpodAsset} ${measureLabel}复合方向指标`,
+                left: 'center',
+                textStyle: { fontSize: 18, fontWeight: 600 }
+            },
+            tooltip: {
+                trigger: 'axis',
+                formatter: params => {
+                    const row = rows[params[0].dataIndex];
+                    let html = `${params[0].axisValue}<br/>`;
+                    params.forEach(p => {
+                        html += `${p.marker} ${p.seriesName.split('，')[0]}: <b>${formatNum(p.value)}</b><br/>`;
+                    });
+                    html += `真实方向: ${row.I_true >= 0 ? '上涨' : '下跌'} (${formatNum(row.I_true)})`;
+                    return html;
+                }
+            },
+            legend: { data: legendNames, bottom: 22 },
+            grid: { left: '4%', right: '3%', top: 58, bottom: 92, containLabel: true },
+            dataZoom: [
+                { type: 'inside', start: 0, end: 100 },
+                { type: 'slider', start: 0, end: 100, bottom: 52 }
+            ],
+            xAxis: {
+                type: 'category',
+                name: '期权到期日',
+                data: rows.map(row => row.expiry),
+                axisLabel: { rotate: 40 }
+            },
+            yAxis: {
+                type: 'value',
+                name: `${measureLabel} - 标的价格`,
+                scale: true
+            },
+            series: [
+                {
+                    name: legendNames[0],
+                    type: 'line',
+                    data: rows.map(row => row.I_5),
+                    symbol: 'circle',
+                    symbolSize: 7,
+                    itemStyle: { color: '#c62828' },
+                    lineStyle: { color: '#c62828', width: 2.4 }
+                },
+                {
+                    name: legendNames[1],
+                    type: 'line',
+                    data: rows.map(row => row.I_10),
+                    symbol: 'rect',
+                    symbolSize: 7,
+                    itemStyle: { color: '#1565c0' },
+                    lineStyle: { color: '#1565c0', width: 2.4 }
+                },
+                {
+                    name: legendNames[2],
+                    type: 'line',
+                    data: rows.map(row => row.I_all),
+                    symbol: 'triangle',
+                    symbolSize: 8,
+                    itemStyle: { color: '#2e7d32' },
+                    lineStyle: { color: '#2e7d32', width: 2.4 }
+                },
+                {
+                    name: '零轴',
+                    type: 'line',
+                    data: rows.map(() => 0),
+                    symbol: 'none',
+                    silent: true,
+                    lineStyle: { color: '#263238', type: 'dashed', width: 1.5 }
+                }
+            ]
+        }, true);
+    }
+
+    function renderIpodSummary(asset) {
+        const tbody = document.getElementById('ipod-summary-body');
+        const measures = ipodDirectionData.measures || {};
+        const normalRows = Object.keys(measures).map(measureKey => {
+            const measure = asset.measures[measureKey];
+            if (!measure) return '';
+            const acc = measure.accuracies || {};
+            return `
+                <tr>
+                    <td>${asset.label || currentIpodAsset} / ${measure.label || measures[measureKey]}</td>
+                    <td>${measure.sample_size}</td>
+                    <td>${formatPct(acc.I_5 || 0)}</td>
+                    <td>${formatPct(acc.I_10 || 0)}</td>
+                    <td>${formatPct(acc.I_all || 0)}</td>
+                    <td><span class="best-tag">${indicatorLabel(measure.best || '-')}</span></td>
+                </tr>
+            `;
+        });
+
+        const inverseRows = currentIpodAsset.startsWith('OG')
+            ? Object.keys(measures).map(measureKey => {
+                const measure = asset.measures[measureKey];
+                if (!measure) return '';
+                const rows = measure.series || [];
+                const acc = {
+                    I_5: inverseAccuracy(rows, 'I_5'),
+                    I_10: inverseAccuracy(rows, 'I_10'),
+                    I_all: inverseAccuracy(rows, 'I_all')
+                };
+                const best = bestAccuracyKey(acc);
+                return `
+                    <tr class="inverse-row">
+                        <td>${asset.label || currentIpodAsset} / 反向${measure.label || measures[measureKey]}</td>
+                        <td>${rows.length}</td>
+                        <td>${formatPct(acc.I_5)}</td>
+                        <td>${formatPct(acc.I_10)}</td>
+                        <td>${formatPct(acc.I_all)}</td>
+                        <td><span class="best-tag">${indicatorLabel(best)}</span></td>
+                    </tr>
+                `;
+            })
+            : [];
+
+        tbody.innerHTML = normalRows.concat(inverseRows).join('');
+    }
+
+    function bestAccuracyKey(accuracies) {
+        return Object.keys(accuracies).reduce((best, key) => {
+            return accuracies[key] > accuracies[best] ? key : best;
+        }, 'I_5');
+    }
+
+    function initGarchPanel() {
+        const assets = garchData.assets || {};
+        const assetKeys = Object.keys(assets);
+        if (!assetKeys.length) return;
+
+        if (!garchInitialized) {
+            const selector = document.getElementById('select-garch-asset');
+            selector.innerHTML = assetKeys
+                .map(key => `<option value="${key}">${assets[key].label || key}</option>`)
+                .join('');
+
+            if (!assets[currentGarchAsset]) currentGarchAsset = assetKeys[0];
+
+            cGarchVol = echarts.init(document.getElementById('chart-garch-vol'));
+            cGarchHorse = echarts.init(document.getElementById('chart-garch-horse'));
+            cGarchBaseline = echarts.init(document.getElementById('chart-garch-baseline'));
+            garchInitialized = true;
+        }
+
+        renderGarchPanel();
+    }
+
+    function switchGarchAsset(assetKey) {
+        currentGarchAsset = assetKey;
+        renderGarchPanel();
+    }
+
+    function switchGarchHorseHorizon(horizon) {
+        currentGarchHorseHorizon = String(horizon);
+        renderGarchHorse();
+    }
+
+    function switchGarchBaselineHorizon(horizon) {
+        currentGarchBaselineHorizon = String(horizon);
+        renderGarchBaseline();
+    }
+
+    function resizeGarchCharts() {
+        if (cGarchVol) cGarchVol.resize();
+        if (cGarchHorse) cGarchHorse.resize();
+        if (cGarchBaseline) cGarchBaseline.resize();
+    }
+
+    function formatMetric(value, digits = 4) {
+        if (value == null || Number.isNaN(Number(value))) return '--';
+        return Number(value).toFixed(digits);
+    }
+
+    function renderGarchPanel() {
+        const asset = (garchData.assets || {})[currentGarchAsset];
+        if (!asset || !garchInitialized) return;
+        syncGarchHorizonSelectors(asset);
+
+        document.getElementById('garch-asset-label').innerText = asset.label || currentGarchAsset;
+        document.getElementById('select-garch-asset').value = currentGarchAsset;
+        document.getElementById('select-garch-horse-horizon').value = currentGarchHorseHorizon;
+        document.getElementById('select-garch-baseline-horizon').value = currentGarchBaselineHorizon;
+
+        renderGarchVol();
+        renderGarchHorse();
+        renderGarchBaseline();
+    }
+
+    function syncGarchHorizonSelectors(asset) {
+        const horizons = asset.horizons || garchData.horizons || [1, 5, 10, 21, 42, 63];
+        const horizonValues = horizons.map(String);
+        if (!horizonValues.includes(currentGarchHorseHorizon)) currentGarchHorseHorizon = horizonValues[0];
+        if (!horizonValues.includes(currentGarchBaselineHorizon)) currentGarchBaselineHorizon = horizonValues[0];
+
+        const horizonOptions = horizons
+            .map(h => `<option value="${h}">h = ${h}</option>`)
+            .join('');
+        document.getElementById('select-garch-horse-horizon').innerHTML = horizonOptions;
+        document.getElementById('select-garch-baseline-horizon').innerHTML = horizonOptions;
+    }
+
+    function renderGarchVol() {
+        const asset = (garchData.assets || {})[currentGarchAsset];
+        if (!asset || !cGarchVol) return;
+        const rows = asset.daily || [];
+        cGarchVol.setOption({
+            tooltip: {
+                trigger: 'axis',
+                formatter: params => {
+                    let html = `${params[0].axisValue}<br/>`;
+                    params.forEach(p => {
+                        const suffix = p.seriesName === '对数收益率' ? '' : '';
+                        html += `${p.marker} ${p.seriesName}: <b>${formatMetric(p.value, 4)}${suffix}</b><br/>`;
+                    });
+                    return html;
+                }
+            },
+            legend: { data: ['对数收益率', 'GV：GARCH预测波动率'], top: 8 },
+            grid: { left: '4%', right: '4%', top: 56, bottom: 84, containLabel: true },
+            dataZoom: [
+                { type: 'inside', start: 0, end: 100 },
+                { type: 'slider', start: 0, end: 100, bottom: 42 }
+            ],
+            xAxis: { type: 'category', data: rows.map(row => row.date) },
+            yAxis: [
+                { type: 'value', name: '对数收益率', scale: true },
+                { type: 'value', name: '年化波动率', scale: true }
+            ],
+            series: [
+                {
+                    name: '对数收益率',
+                    type: 'line',
+                    data: rows.map(row => row.log_ret),
+                    connectNulls: true,
+                    showSymbol: false,
+                    lineStyle: { color: '#6b7280', width: 1.2 }
+                },
+                {
+                    name: 'GV：GARCH预测波动率',
+                    type: 'line',
+                    yAxisIndex: 1,
+                    data: rows.map(row => row.gv),
+                    connectNulls: true,
+                    showSymbol: false,
+                    lineStyle: { color: '#174ea6', width: 2.2 }
+                }
+            ]
+        }, true);
+    }
+
+    function renderGarchHorse() {
+        const asset = (garchData.assets || {})[currentGarchAsset];
+        if (!asset || !cGarchHorse) return;
+        const metrics = (asset.horse_race.metrics || {})[currentGarchHorseHorizon] || {};
+        const rows = (asset.horse_race.predictions || {})[currentGarchHorseHorizon] || [];
+
+        document.getElementById('garch-horse-rmse').innerText = formatMetric(metrics.rmse, 4);
+        document.getElementById('garch-horse-qlike').innerText = formatMetric(metrics.qlike, 4);
+        document.getElementById('garch-horse-n').innerText = metrics.n || '--';
+
+        cGarchHorse.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['实际波动率', 'GV+IV拟合波动率'], top: 8 },
+            grid: { left: '4%', right: '3%', top: 56, bottom: 84, containLabel: true },
+            dataZoom: [
+                { type: 'inside', start: 0, end: 100 },
+                { type: 'slider', start: 0, end: 100, bottom: 42 }
+            ],
+            xAxis: { type: 'category', data: rows.map(row => row.date) },
+            yAxis: { type: 'value', name: '年化波动率', scale: true },
+            series: [
+                {
+                    name: '实际波动率',
+                    type: 'line',
+                    data: rows.map(row => row.actual),
+                    showSymbol: false,
+                    lineStyle: { color: '#455a64', width: 1.4 }
+                },
+                {
+                    name: 'GV+IV拟合波动率',
+                    type: 'line',
+                    data: rows.map(row => row.predict),
+                    showSymbol: false,
+                    smooth: true,
+                    lineStyle: { color: '#dc3545', width: 2.2 }
+                }
+            ]
+        }, true);
+    }
+
+    function renderGarchBaseline() {
+        const asset = (garchData.assets || {})[currentGarchAsset];
+        if (!asset || !cGarchBaseline) return;
+        const metrics = (asset.baseline.metrics || {})[currentGarchBaselineHorizon] || {};
+        const rows = (asset.baseline.predictions || {})[currentGarchBaselineHorizon] || [];
+
+        document.getElementById('garch-baseline-r2').innerText = formatMetric(metrics.r2_os, 4);
+        document.getElementById('garch-baseline-n').innerText = metrics.n_oos || '--';
+        renderGarchR2Table(asset);
+
+        cGarchBaseline.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['实际超额收益率', 'GV预测收益率', '历史均值基准'], top: 8 },
+            grid: { left: '4%', right: '3%', top: 56, bottom: 84, containLabel: true },
+            dataZoom: [
+                { type: 'inside', start: 0, end: 100 },
+                { type: 'slider', start: 0, end: 100, bottom: 42 }
+            ],
+            xAxis: { type: 'category', data: rows.map(row => row.date) },
+            yAxis: { type: 'value', name: '累计超额对数收益率', scale: true },
+            series: [
+                {
+                    name: '实际超额收益率',
+                    type: 'line',
+                    data: rows.map(row => row.actual),
+                    showSymbol: false,
+                    lineStyle: { color: '#455a64', width: 1.4 }
+                },
+                {
+                    name: 'GV预测收益率',
+                    type: 'line',
+                    data: rows.map(row => row.predict),
+                    showSymbol: false,
+                    smooth: true,
+                    lineStyle: { color: '#0d6efd', width: 2.2 }
+                },
+                {
+                    name: '历史均值基准',
+                    type: 'line',
+                    data: rows.map(row => row.benchmark),
+                    showSymbol: false,
+                    lineStyle: { color: '#f59f00', width: 1.8, type: 'dashed' }
+                }
+            ]
+        }, true);
+    }
+
+    function renderGarchR2Table(asset) {
+        const tbody = document.getElementById('garch-r2-table-body');
+        if (!tbody) return;
+        const horizons = asset.horizons || garchData.horizons || [1, 5, 10, 21, 42, 63];
+        const metrics = asset.baseline.metrics || {};
+        tbody.innerHTML = horizons.map(h => {
+            const metric = metrics[String(h)] || {};
+            const value = metric.r2_os == null ? '--' : Number(metric.r2_os).toFixed(6);
+            return `
+                <tr>
+                    <td>${h}</td>
+                    <td>${value}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function initEvalPanel() {
+        const assets = evalData.assets || {};
+        const assetKeys = Object.keys(assets);
+        if (!assetKeys.length) return;
+
+        if (!evalInitialized) {
+            const selector = document.getElementById('select-eval-asset');
+            selector.innerHTML = assetKeys
+                .map(key => `<option value="${key}">${assets[key].label || key}</option>`)
+                .join('');
+
+            if (!assets[currentEvalAsset]) currentEvalAsset = assetKeys[0];
+            cEvalRolling = echarts.init(document.getElementById('chart-eval-rolling'));
+            evalInitialized = true;
+        }
+
+        syncEvalFactorSelector();
+        renderEvalPanel();
+    }
+
+    function switchEvalAsset(assetKey) {
+        currentEvalAsset = assetKey;
+        syncEvalFactorSelector();
+        renderEvalPanel();
+    }
+
+    function switchEvalFactor(factor) {
+        currentEvalFactor = factor;
+        renderEvalPanel();
+    }
+
+    function resizeEvalCharts() {
+        if (cEvalRolling) cEvalRolling.resize();
+    }
+
+    function syncEvalFactorSelector() {
+        const asset = (evalData.assets || {})[currentEvalAsset];
+        if (!asset) return;
+        const selector = document.getElementById('select-eval-factor');
+        const factors = asset.factors || {};
+        const available = asset.predictions || {};
+        const groups = [
+            ['隐含波动率十因子', factors.ten || []],
+            ['风险中性四因子', factors.four || []],
+            ['风险溢价六因子', factors.six || []]
+        ];
+        selector.innerHTML = groups.map(([label, names]) => {
+            const options = names
+                .filter(name => available[name])
+                .map(name => `<option value="${name}">${name}</option>`)
+                .join('');
+            return options ? `<optgroup label="${label}">${options}</optgroup>` : '';
+        }).join('');
+
+        const allFactors = groups.flatMap(([, names]) => names).filter(name => available[name]);
+        if (!allFactors.includes(currentEvalFactor)) currentEvalFactor = allFactors[0] || '';
+        selector.value = currentEvalFactor;
+    }
+
+    function renderEvalPanel() {
+        const asset = (evalData.assets || {})[currentEvalAsset];
+        if (!asset || !evalInitialized || !currentEvalFactor) return;
+        const factorData = (asset.predictions || {})[currentEvalFactor];
+        if (!factorData) return;
+
+        document.getElementById('eval-asset-label').innerText = asset.label || currentEvalAsset;
+        document.getElementById('select-eval-asset').value = currentEvalAsset;
+        document.getElementById('select-eval-factor').value = currentEvalFactor;
+
+        renderEvalRollingChart(asset, factorData);
+        renderEvalConfusion('eval-confusion-expanding', (asset.confusion || {})[currentEvalFactor]?.expanding);
+        renderEvalConfusion('eval-confusion-rolling', (asset.confusion || {})[currentEvalFactor]?.rolling);
+        renderEvalFactorTable(asset);
+    }
+
+    function renderEvalRollingChart(asset, factorData) {
+        const rolling = factorData.rolling || {};
+        const metrics = rolling.metrics || {};
+        const rows = rolling.rows || [];
+        document.getElementById('eval-r2-display').innerText = `R² OS: ${formatMetric(metrics.r2_os, 4)}% | 最优h: ${metrics.horizon || '--'}`;
+
+        cEvalRolling.setOption({
+            tooltip: {
+                trigger: 'axis',
+                formatter: params => {
+                    let html = `${params[0].axisValue}<br/>`;
+                    params.forEach(p => {
+                        html += `${p.marker} ${p.seriesName}: <b>${formatMetric(p.value, 4)}</b><br/>`;
+                    });
+                    return html;
+                }
+            },
+            legend: { data: ['实际超额收益率', '30天滚动预测线', '滚动均值基准'], top: 8 },
+            grid: { left: '4%', right: '3%', top: 56, bottom: 84, containLabel: true },
+            dataZoom: [
+                { type: 'inside', start: 0, end: 100 },
+                { type: 'slider', start: 0, end: 100, bottom: 42 }
+            ],
+            xAxis: { type: 'category', data: rows.map(row => row.date) },
+            yAxis: { type: 'value', name: 'Return (%)', scale: true },
+            series: [
+                {
+                    name: '实际超额收益率',
+                    type: 'line',
+                    data: rows.map(row => row.actual),
+                    showSymbol: false,
+                    lineStyle: { color: '#9aa6b2', width: 1.3, opacity: 0.65 }
+                },
+                {
+                    name: '30天滚动预测线',
+                    type: 'line',
+                    data: rows.map(row => row.predict),
+                    showSymbol: false,
+                    smooth: true,
+                    lineStyle: { color: '#dc3545', width: 2.4 }
+                },
+                {
+                    name: '滚动均值基准',
+                    type: 'line',
+                    data: rows.map(row => row.benchmark),
+                    showSymbol: false,
+                    lineStyle: { color: '#f59f00', width: 1.7, type: 'dashed' }
+                }
+            ]
+        }, true);
+    }
+
+    function renderEvalConfusion(targetId, matrix) {
+        const target = document.getElementById(targetId);
+        if (!target) return;
+        const m = matrix || {};
+        target.innerHTML = `
+            <table class="confusion-table">
+                <thead>
+                    <tr>
+                        <th>预测 \\ 实际</th>
+                        <th>正向</th>
+                        <th>负向</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <th>正向</th>
+                        <td>${m.tp || 0}</td>
+                        <td>${m.fp || 0}</td>
+                    </tr>
+                    <tr>
+                        <th>负向</th>
+                        <td>${m.fn || 0}</td>
+                        <td>${m.tn || 0}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="metric-strip mt-3">
+                <div class="metric-chip accuracy-chip"><span>预测准确率</span><strong>${formatPct(m.accuracy || 0)}</strong></div>
+                <div class="metric-chip"><span>精确率</span><strong>${formatPct(m.precision || 0)}</strong></div>
+                <div class="metric-chip"><span>有效样本</span><strong>${m.n || 0}</strong></div>
+            </div>
+        `;
+    }
+
+    function renderEvalFactorTable(asset) {
+        const tbody = document.getElementById('eval-factor-table-body');
+        if (!tbody) return;
+        const rows = asset.factor_table || [];
+        tbody.innerHTML = rows.map(row => {
+            if (row.is_group) {
+                return `<tr class="factor-group-row"><td colspan="8">${row.factor_name}</td></tr>`;
+            }
+            const sigClass = row.significance === '显著' ? 'sig-yes' : 'sig-no';
+            return `
+                <tr>
+                    <td>${row.factor_name || '-'}</td>
+                    <td>${row.description || '-'}</td>
+                    <td>${formatMetric(row.r2_os, 4)}</td>
+                    <td>${row.horizon || '-'}</td>
+                    <td>${formatMetric(row.baseline_r2, 4)}</td>
+                    <td>${formatMetric(row.rank_ic, 4)}</td>
+                    <td>${formatPct(row.accuracy || 0)}</td>
+                    <td><span class="${sigClass}">${row.significance || '不显著'}</span></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function initPac5Panel() {
+        const asset = (pac5Data.assets || {})[currentPac5Asset];
+        if (!asset) return;
+
+        if (!pac5Initialized) {
+            cPac5Price = echarts.init(document.getElementById('chart-pac5-price'));
+            cPac5Factor = echarts.init(document.getElementById('chart-pac5-factor'));
+            cPac5Rolling = echarts.init(document.getElementById('chart-pac5-rolling'));
+            pac5Initialized = true;
+        }
+
+        syncPac5Selectors(asset);
+        renderPac5Panel();
+    }
+
+    function syncPac5Selectors(asset) {
+        const factorSelectors = [
+            document.getElementById('select-pac5-factor-main'),
+            document.getElementById('select-pac5-factor-reg')
+        ];
+        const groups = asset.factor_groups || [
+            { label: '隐含波动率十因子', factors: (asset.factors || {}).ten || [] },
+            { label: '风险中性四因子', factors: (asset.factors || {}).four || [] },
+            { label: '风险溢价六因子', factors: (asset.factors || {}).six || [] }
+        ];
+        const available = asset.predictions || {};
+        const factorHtml = groups.map(group => {
+            const options = (group.factors || [])
+                .filter(name => available[name])
+                .map(name => `<option value="${name}">${name}</option>`)
+                .join('');
+            return options ? `<optgroup label="${group.label}">${options}</optgroup>` : '';
+        }).join('');
+        const allFactors = groups.flatMap(group => group.factors || []).filter(name => available[name]);
+        if (!allFactors.includes(currentPac5Factor)) currentPac5Factor = allFactors[0] || '';
+        factorSelectors.forEach(selector => {
+            if (!selector) return;
+            selector.innerHTML = factorHtml;
+            selector.value = currentPac5Factor;
+        });
+
+        const windowSelector = document.getElementById('select-pac5-window');
+        const windows = pac5Data.windows || [30, 60, 90, 180, 360];
+        windowSelector.innerHTML = windows.map(item => `<option value="${item}">H=${item}</option>`).join('');
+        if (!windows.map(String).includes(currentPac5Window)) currentPac5Window = String(windows[0] || 30);
+        windowSelector.value = currentPac5Window;
+
+        const horizonSelector = document.getElementById('select-pac5-horizon');
+        const horizons = pac5Data.horizons || [1, 5, 10, 21, 42, 63];
+        horizonSelector.innerHTML = horizons.map(item => `<option value="${item}">h=${item}</option>`).join('');
+        if (!horizons.map(String).includes(currentPac5Horizon)) currentPac5Horizon = String(horizons[0] || 1);
+        horizonSelector.value = currentPac5Horizon;
+        document.getElementById('select-pac5-preference').value = currentPac5Preference;
+    }
+
+    function switchPac5Factor(factor) {
+        currentPac5Factor = factor;
+        renderPac5Panel();
+    }
+
+    function switchPac5Window(windowValue) {
+        currentPac5Window = String(windowValue);
+        renderPac5Panel();
+    }
+
+    function switchPac5Horizon(horizon) {
+        currentPac5Horizon = String(horizon);
+        renderPac5Panel();
+    }
+
+    function switchPac5Preference(preference) {
+        currentPac5Preference = preference;
+        renderPac5Summary();
+        renderPac5FactorTable();
+    }
+
+    function resizePac5Charts() {
+        if (cPac5Price) cPac5Price.resize();
+        if (cPac5Factor) cPac5Factor.resize();
+        if (cPac5Rolling) cPac5Rolling.resize();
+    }
+
+    function renderPac5Panel() {
+        const asset = (pac5Data.assets || {})[currentPac5Asset];
+        if (!asset || !pac5Initialized || !currentPac5Factor) return;
+        document.getElementById('pac5-asset-label').innerText = asset.label || currentPac5Asset;
+        document.getElementById('select-pac5-factor-main').value = currentPac5Factor;
+        document.getElementById('select-pac5-factor-reg').value = currentPac5Factor;
+        document.getElementById('select-pac5-window').value = currentPac5Window;
+        document.getElementById('select-pac5-horizon').value = currentPac5Horizon;
+        renderPac5Summary();
+        renderPac5PriceAndFactor(asset);
+        renderPac5RollingChart(asset);
+        renderPac5FactorTable();
+    }
+
+    function isPac5Significant(row) {
+        return (row.significance === '显著') || ((row.accuracy || 0) > 0.5 && (row.r2_os || 0) > 0);
+    }
+
+    function getPac5LatestPrediction(asset, row) {
+        const factor = row.factor_key;
+        const win = String(row.window || '');
+        const horizon = String(row.horizon || '');
+        const run = (((asset.predictions || {})[factor] || {}).windows || {})[win]?.horizons?.[horizon] || {};
+        const rows = run.rows || [];
+        if (!rows.length) return null;
+        const last = rows[rows.length - 1] || {};
+        if (last.predict === null || last.predict === undefined || Number.isNaN(Number(last.predict))) return null;
+        return Number(last.predict);
+    }
+
+    function pac5WeightFor(row) {
+        if (currentPac5Preference === 'accuracy') {
+            return Math.max((row.accuracy || 0) - 0.5, 0.001);
+        }
+        return Math.max(row.r2_os || 0, 0.001);
+    }
+
+    function pac5Mode(values) {
+        const counts = {};
+        values.filter(v => v !== null && v !== undefined && v !== '').forEach(v => {
+            const key = String(v);
+            counts[key] = (counts[key] || 0) + 1;
+        });
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        return sorted.length ? sorted[0][0] : '--';
+    }
+
+    function pac5HorizonBucket(horizon) {
+        const h = Number(horizon);
+        if (!Number.isFinite(h)) return '期限未定';
+        if (h <= 5) return '短期';
+        if (h <= 21) return '中期';
+        return '中长期';
+    }
+
+    function pac5DirectionLabel(value, horizon) {
+        if (!Number.isFinite(value) || Math.abs(value) < 0.01) return `${pac5HorizonBucket(horizon)}中性`;
+        return `${pac5HorizonBucket(horizon)}${value > 0 ? '偏多' : '偏空'}`;
+    }
+
+    function formatSignedMetric(value, digits = 4) {
+        if (!Number.isFinite(value)) return '--';
+        const sign = value > 0 ? '+' : '';
+        return `${sign}${value.toFixed(digits)}%`;
+    }
+
+    function renderPac5Summary() {
+        const asset = (pac5Data.assets || {})[currentPac5Asset];
+        const target = document.getElementById('pac5-summary-grid');
+        if (!asset || !target) return;
+        const tableRows = (((asset.factor_tables || {})[currentPac5Preference]) || [])
+            .filter(row => !row.is_group && row.factor_key);
+        const significantRows = tableRows.filter(isPac5Significant);
+        const selectedRows = significantRows.length ? significantRows : tableRows;
+        const signals = selectedRows.map(row => {
+            const predict = getPac5LatestPrediction(asset, row);
+            const weight = pac5WeightFor(row);
+            return { ...row, predict, weight, contribution: Number.isFinite(predict) ? predict * weight : null };
+        }).filter(row => Number.isFinite(row.predict));
+
+        const totalWeight = signals.reduce((sum, row) => sum + row.weight, 0);
+        const composite = totalWeight > 0
+            ? signals.reduce((sum, row) => sum + row.predict * row.weight, 0) / totalWeight
+            : null;
+        const directionSign = Number.isFinite(composite) && Math.abs(composite) >= 0.01 ? Math.sign(composite) : 0;
+        const directionalSignals = signals.filter(row => row.predict !== 0);
+        const aligned = directionSign === 0
+            ? directionalSignals.filter(row => Math.abs(row.predict) < 0.01).length
+            : directionalSignals.filter(row => Math.sign(row.predict) === directionSign).length;
+        const consistency = directionalSignals.length ? aligned / directionalSignals.length : null;
+        const bestHorizon = pac5Mode(signals.map(row => row.horizon));
+        const bestWindow = pac5Mode(signals.map(row => row.window));
+        const positive = signals
+            .filter(row => row.contribution > 0)
+            .sort((a, b) => b.contribution - a.contribution)
+            .slice(0, 3)
+            .map(row => row.factor_key);
+        const negative = signals
+            .filter(row => row.contribution < 0)
+            .sort((a, b) => a.contribution - b.contribution)
+            .slice(0, 3)
+            .map(row => row.factor_key);
+        const preferenceText = currentPac5Preference === 'accuracy' ? '预测准确率偏好' : '拟合优度偏好';
+        const cardData = [
+            {
+                label: '模型综合判断',
+                value: pac5DirectionLabel(composite, bestHorizon),
+                note: `${preferenceText}，基于${signals.length || 0}个可用因子`
+            },
+            {
+                label: '预测期限',
+                value: bestHorizon === '--' ? '--' : `h=${bestHorizon}`,
+                note: `${pac5HorizonBucket(bestHorizon)}口径出现最多`
+            },
+            {
+                label: '综合预测超额收益率',
+                value: formatSignedMetric(composite, 4),
+                note: '按当前偏好加权后的最新预测'
+            },
+            {
+                label: '方向一致性',
+                value: consistency === null ? '--' : formatPct(consistency),
+                note: '同向因子数 / 可用因子数'
+            },
+            {
+                label: '显著因子数量',
+                value: `${significantRows.length}/${tableRows.length || 0}`,
+                note: '预测准确率>50% 且 R方os>0'
+            },
+            {
+                label: '最优窗口',
+                value: bestWindow === '--' ? '--' : `H=${bestWindow}`,
+                note: '优势因子最常见滚动窗口'
+            },
+            {
+                label: '主要正向因子',
+                value: positive.length ? positive.join('、') : '--',
+                note: '按加权贡献排序'
+            },
+            {
+                label: '主要负向因子',
+                value: negative.length ? negative.join('、') : '--',
+                note: '按加权贡献排序'
+            }
+        ];
+        target.innerHTML = cardData.map(card => `
+            <div class="pac5-summary-card">
+                <div class="card-label">${card.label}</div>
+                <div class="card-value">${card.value}</div>
+                <div class="card-note">${card.note}</div>
+            </div>
+        `).join('');
+    }
+
+    function renderPac5PriceAndFactor(asset) {
+        const rows = asset.section_all || [];
+        const dates = rows.map(row => row.date);
+        cPac5Price.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['标的收盘价'], top: 8 },
+            grid: { left: '4%', right: '3%', top: 52, bottom: 82, containLabel: true },
+            dataZoom: [
+                { type: 'inside', start: 0, end: 100 },
+                { type: 'slider', start: 0, end: 100, bottom: 36 }
+            ],
+            xAxis: { type: 'category', data: dates },
+            yAxis: { type: 'value', name: 'Price', scale: true },
+            series: [{
+                name: '标的收盘价',
+                type: 'line',
+                data: rows.map(row => row.close),
+                showSymbol: false,
+                smooth: true,
+                lineStyle: { color: '#2563eb', width: 2.2 }
+            }]
+        }, true);
+
+        cPac5Factor.setOption({
+            tooltip: {
+                trigger: 'axis',
+                formatter: params => {
+                    const p = params[0];
+                    return `${p.axisValue}<br/>${p.marker} ${currentPac5Factor}: <b>${formatMetric(p.value, 6)}</b>`;
+                }
+            },
+            legend: { data: [currentPac5Factor], top: 8 },
+            grid: { left: '4%', right: '3%', top: 52, bottom: 82, containLabel: true },
+            dataZoom: [
+                { type: 'inside', start: 0, end: 100 },
+                { type: 'slider', start: 0, end: 100, bottom: 36 }
+            ],
+            xAxis: { type: 'category', data: dates },
+            yAxis: { type: 'value', name: 'Factor', scale: true },
+            series: [{
+                name: currentPac5Factor,
+                type: 'line',
+                data: rows.map(row => row[currentPac5Factor]),
+                showSymbol: false,
+                smooth: true,
+                lineStyle: { color: '#dc3545', width: 2 }
+            }]
+        }, true);
+    }
+
+    function getPac5SelectedRun(asset) {
+        return (((asset.predictions || {})[currentPac5Factor] || {}).windows || {})[currentPac5Window]?.horizons?.[currentPac5Horizon] || {};
+    }
+
+    function renderPac5RollingChart(asset) {
+        const run = getPac5SelectedRun(asset);
+        const metrics = run.metrics || {};
+        const rows = run.rows || [];
+        document.getElementById('pac5-r2-display').innerText =
+            `R² OS: ${formatMetric(metrics.r2_os, 4)}% | 准确率: ${formatPct(metrics.accuracy || 0)}`;
+        cPac5Rolling.setOption({
+            tooltip: {
+                trigger: 'axis',
+                formatter: params => {
+                    let html = `${params[0].axisValue}<br/>`;
+                    params.forEach(p => {
+                        html += `${p.marker} ${p.seriesName}: <b>${formatMetric(p.value, 4)}</b><br/>`;
+                    });
+                    return html;
+                }
+            },
+            legend: { data: ['实际超额收益率', `${currentPac5Window}天滚动预测线`, '滚动均值基准'], top: 8 },
+            grid: { left: '4%', right: '3%', top: 56, bottom: 84, containLabel: true },
+            dataZoom: [
+                { type: 'inside', start: 0, end: 100 },
+                { type: 'slider', start: 0, end: 100, bottom: 42 }
+            ],
+            xAxis: { type: 'category', data: rows.map(row => row.date) },
+            yAxis: { type: 'value', name: 'Return (%)', scale: true },
+            series: [
+                {
+                    name: '实际超额收益率',
+                    type: 'line',
+                    data: rows.map(row => row.actual),
+                    showSymbol: false,
+                    lineStyle: { color: '#9aa6b2', width: 1.3, opacity: 0.65 }
+                },
+                {
+                    name: `${currentPac5Window}天滚动预测线`,
+                    type: 'line',
+                    data: rows.map(row => row.predict),
+                    showSymbol: false,
+                    smooth: true,
+                    lineStyle: { color: '#dc3545', width: 2.4 }
+                },
+                {
+                    name: '滚动均值基准',
+                    type: 'line',
+                    data: rows.map(row => row.benchmark),
+                    showSymbol: false,
+                    lineStyle: { color: '#f59f00', width: 1.7, type: 'dashed' }
+                }
+            ]
+        }, true);
+    }
+
+    function renderPac5FactorTable() {
+        const asset = (pac5Data.assets || {})[currentPac5Asset];
+        const tbody = document.getElementById('pac5-factor-table-body');
+        if (!asset || !tbody) return;
+        const rows = ((asset.factor_tables || {})[currentPac5Preference]) || [];
+        tbody.innerHTML = rows.map(row => {
+            if (row.is_group) {
+                return `<tr class="factor-group-row"><td colspan="7">${row.factor_name}</td></tr>`;
+            }
+            const sigClass = row.significance === '显著' ? 'sig-yes' : 'sig-no';
+            return `
+                <tr>
+                    <td>${row.factor_name || '-'}</td>
+                    <td>${row.description || '-'}</td>
+                    <td>${formatMetric(row.r2_os, 4)}</td>
+                    <td>${row.window ? `H=${row.window}` : '-'}</td>
+                    <td>${row.horizon ? `h=${row.horizon}` : '-'}</td>
+                    <td>${formatPct(row.accuracy || 0)}</td>
+                    <td><span class="${sigClass}">${row.significance || '不显著'}</span></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    window.onload = () => { initBase(); };
+    window.onresize = () => { c1.resize(); c2.resize(); c3.resize(); if (cIpodDirection) cIpodDirection.resize(); resizeGarchCharts(); resizeEvalCharts(); resizePac5Charts(); };
+</script>
+</body>
+</html>
